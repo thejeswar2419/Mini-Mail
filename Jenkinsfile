@@ -3,12 +3,6 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/thejeswar2419/Mini-Mail.git'
-            }
-        }
-
         stage('Setup Python') {
             steps {
                 bat 'python --version'
@@ -24,7 +18,6 @@ pipeline {
 
         stage('Run App Check') {
             steps {
-                bat 'echo Flask app syntax check...'
                 bat 'python -m py_compile app.py'
             }
         }
