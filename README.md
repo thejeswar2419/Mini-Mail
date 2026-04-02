@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Cipher Mail
 
 A dark, sleek private messaging web app built with Flask + MySQL.
@@ -77,4 +77,4 @@ minimail/
 | Receiver lookup | None | Live AJAX user lookup on compose |
 =======
 # Mini-Mail
->>>>>>> 3a547eccf3cb1dbbd849ea3c6896c63e2ba81fab
+
