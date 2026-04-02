@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+    environment {
+        DB_HOST = 'localhost'
+        DB_USER = 'root'
+        DB_PASSWORD = 'thejeswar'
+        SECRET_KEY = 'testsecret123'
+    }
+
     stages {
 
         stage('Setup Python') {
@@ -12,8 +19,13 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                bat 'python -m pip install --upgrade pip'
                 bat 'python -m pip install -r requirements.txt'
+            }
+        }
+
+        stage('Env Check') {
+            steps {
+                bat 'echo DB_HOST=%DB_HOST%'
             }
         }
 
