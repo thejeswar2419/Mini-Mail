@@ -14,5 +14,5 @@ def client():
 @pytest.fixture
 def logged_in_client(client):
     with client.session_transaction() as session:
-        session['user'] = 'testuser'
+        session['user_id'] = 'testuser'
     return client
