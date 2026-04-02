@@ -34,6 +34,12 @@ pipeline {
                 bat 'python -m py_compile app.py'
             }
         }
+        stage('Run Tests') {
+            steps {
+                bat 'python -m pip install pytest'
+                bat 'pytest'
+            }
+        }
     }
 
     post {
