@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Messages — Mini Mail{% endblock %}
+{% block content %}
+
+<div class="page-header flex-between">
+  <div>
+    <h1>Messages</h1>
+    <p>{{ received|length }} received · {{ sent|length }} sent</p>
+  </div>
+  <a href="{{ url_for('send_message') }}" class="btn btn-primary">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="22" y1="2" x2="11" y2="13"/>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+    Compose
+  </a>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-recv" onclick="switchTab('recv')">Inbox ({{ received|length }})</button>
+  <button class="tab-btn" id="tab-sent" onclick="switchTab('sent')">Sent ({{ sent|length }})</button>
+</div>
+
+<!-- Inbox -->
+<div id="pane-recv">
+  {% if received %}
+    <div class="msg-list">
+      {% for msg in received %}
+      <div class="msg-row" onclick="openModal('recv-{{ loop.index }}')">
+        <div style="min-width:0;">
+          <div class="msg-meta">From <strong>@{{ msg.from }}</strong>
+            {% if msg.attachment %}<span class="attach-badge">📎</span>{% endif %}
+          </div>
+          <div class="msg-preview">{{ msg.preview if msg.preview else '(no text)' }}</div>
+        </div>
+        <div class="msg-actions">
+          <span class="msg-date">{{ msg.date }}</span>
+          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete this message?');">
+            <input type="hidden" name="msg_id" value="{{ msg.id }}">
+            <input type="hidden" name="box_type" value="received">
+            <button class="btn btn-danger btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="recv-{{ loop.index }}">
+        <div class="modal" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <span class="modal-title">Message from @{{ msg.from }}</span>
+            <button class="modal-close" onclick="closeModal('recv-{{ loop.index }}')">✕</button>
+          </div>
+          <div class="modal-meta">{{ msg.date }}</div>
+          {% if msg.full %}<div class="modal-body-text">{{ msg.full }}</div>{% endif %}
+          {% if msg.attachment %}
+            <div class="modal-attachment">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <a href="{{ url_for('download_attachment', filename=msg.attachment) }}" class="auth-link" onclick="event.stopPropagation()">
+                {{ msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment }}
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state card">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <p>Your inbox is empty.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Sent -->
+<div id="pane-sent" class="hidden">
+  {% if sent %}
+    <div class="msg-list">
+      {% for msg in sent %}
+      <div class="msg-row" onclick="openModal('sent-{{ loop.index }}')">
+        <div style="min-width:0;">
+          <div class="msg-meta">To <strong>@{{ msg.to }}</strong>
+            {% if msg.attachment %}<span class="attach-badge">📎</span>{% endif %}
+          </div>
+          <div class="msg-preview">{{ msg.preview if msg.preview else '(no text)' }}</div>
+        </div>
+        <div class="msg-actions">
+          <span class="msg-date">{{ msg.date }}</span>
+          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete for you and receiver?');">
+            <input type="hidden" name="msg_id" value="{{ msg.id }}">
+            <input type="hidden" name="box_type" value="sent">
+            <button class="btn btn-danger btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="sent-{{ loop.index }}">
+        <div class="modal" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <span class="modal-title">Message to @{{ msg.to }}</span>
+            <button class="modal-close" onclick="closeModal('sent-{{ loop.index }}')">✕</button>
+          </div>
+          <div class="modal-meta">{{ msg.date }}</div>
+          {% if msg.full %}<div class="modal-body-text">{{ msg.full }}</div>{% endif %}
+          {% if msg.attachment %}
+            <div class="modal-attachment">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <a href="{{ url_for('download_attachment', filename=msg.attachment) }}" class="auth-link" onclick="event.stopPropagation()">
+                {{ msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment }}
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state card">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      <p>No sent messages yet.</p>
+    </div>
+  {% endif %}
+</div>
+
+<style>
+.attach-badge { font-size: 12px; margin-left: 6px; }
+.modal-attachment {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; padding: 10px 14px;
+  background: var(--accent-dim); border: 1px solid rgba(124,106,247,0.2);
+  border-radius: var(--radius-sm); font-size: 13px; color: var(--accent-2);
+}
+</style>
+{% endblock %}

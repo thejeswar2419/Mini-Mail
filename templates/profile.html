@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Profile — Mini Mail{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Profile</h1>
+  <p>Manage your account and preferences</p>
+</div>
+
+<div class="profile-grid">
+
+  <!-- Left: Avatar card -->
+  <div class="card" style="text-align:center;">
+    <div class="avatar-wrap" style="margin:0 auto 16px;">
+      {% if profile and profile.avatar %}
+        <img src="{{ url_for('uploaded_file', filename=profile.avatar) }}" class="avatar-img" alt="avatar">
+      {% else %}
+        <div class="avatar-default">{{ (profile.display_name or session.user_id)[0]|upper }}</div>
+      {% endif %}
+      <label for="avatar-file" class="avatar-edit-btn" title="Change photo">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </label>
+    </div>
+
+    <div class="avatar-name">{{ profile.display_name if profile else session.user_name }}</div>
+    <div class="avatar-uid">@{{ session.user_id }}</div>
+    {% if profile and profile.mobile_no %}
+      <div class="text-muted text-sm mt-8">{{ profile.mobile_no }}</div>
+    {% endif %}
+    {% if profile and profile.created_at %}
+      <div class="text-muted text-sm mt-4">Joined {{ profile.created_at.strftime('%b %Y') }}</div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="avatar-form">
+      <input type="hidden" name="action" value="upload_avatar">
+      <input type="file" id="avatar-file" name="avatar" accept="image/*" style="display:none"
+             onchange="document.getElementById('avatar-form').submit()">
+    </form>
+
+    <!-- Sign out button inside profile -->
+    <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+      <button class="btn btn-danger btn-sm" style="width:100%;"
+              onclick="document.getElementById('logout-modal').classList.add('open')" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <!-- Right -->
+  <div class="profile-sections">
+
+    <!-- Display Name -->
+    <div class="card card-sm">
+      <div class="section-title">Display Name</div>
+      <form method="post">
+        <input type="hidden" name="action" value="update_name">
+        <div class="form-group">
+          <label class="form-label">Name visible to others</label>
+          <input type="text" name="display_name" class="form-control"
+                 value="{{ profile.display_name if profile else '' }}"
+                 placeholder="Your display name" required>
+          <p class="form-hint">This is what others see when you message them</p>
+        </div>
+        <div style="text-align:right;">
+          <button type="submit" class="btn btn-primary btn-sm">Save Name</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Change Password toggle -->
+    <div class="card card-sm">
+      <div class="flex-between">
+        <div class="section-title" style="margin-bottom:0;flex:1;">Change Password</div>
+        <button class="btn btn-ghost btn-sm" id="pw-toggle-btn" onclick="togglePasswordSection()" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="pw-chevron" style="transition:transform 0.25s ease;">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          Update Password
+        </button>
+      </div>
+
+      <div id="pw-section" style="display:none; margin-top:20px;">
+        <form method="post">
+          <input type="hidden" name="action" value="change_password">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" placeholder="••••••••" required>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" name="new_password" class="form-control" placeholder="min 6 chars" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm New</label>
+              <input type="password" name="confirm_new_password" class="form-control" placeholder="repeat" required>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <button type="submit" class="btn btn-primary btn-sm">Update Password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card card-sm danger-zone">
+      <div class="section-title">Danger Zone</div>
+      <p class="text-muted text-sm" style="margin-bottom:16px;">
+        Permanently deletes your account and all your messages. This cannot be undone.
+      </p>
+      <button class="btn btn-danger btn-sm" onclick="document.getElementById('delete-modal').classList.add('open')" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        </svg>
+        Delete Account
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div class="modal-overlay" id="delete-modal" onclick="this.classList.remove('open')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:var(--rose)">Delete Account</span>
+      <button class="modal-close" onclick="document.getElementById('delete-modal').classList.remove('open')">✕</button>
+    </div>
+    <p class="text-muted text-sm" style="margin-bottom:20px;">
+      This will permanently delete your account, all your messages, and your personal database. Confirm by entering your password.
+    </p>
+    <form method="post" action="{{ url_for('delete_account') }}">
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+      </div>
+      <div class="flex gap-12" style="justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('delete-modal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete Everything</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function togglePasswordSection() {
+  const s = document.getElementById('pw-section');
+  const c = document.getElementById('pw-chevron');
+  const open = s.style.display !== 'none';
+  s.style.display = open ? 'none' : 'block';
+  c.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+</script>
+{% endblock %}

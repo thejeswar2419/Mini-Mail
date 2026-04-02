@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Compose — Mini Mail{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Compose</h1>
+  <p>Send a private message to any user</p>
+</div>
+
+<div class="compose-wrap">
+  <div class="card">
+    <form method="post" enctype="multipart/form-data" id="compose-form">
+      <div class="form-group">
+        <label class="form-label">To (User ID)</label>
+        <input type="text" name="receiver" id="receiver-input" class="form-control"
+               placeholder="enter_user_id" autocomplete="off" required
+               oninput="lookupUser(this.value)">
+        <div id="receiver-status" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Message</label>
+        <textarea name="message" id="msg-area" class="form-control" rows="7"
+                  placeholder="Write your message here…" maxlength="2000"></textarea>
+        <div class="flex-between mt-4">
+          <span class="form-hint">Max 2000 characters</span>
+          <span class="form-hint" id="char-count">0 / 2000</span>
+        </div>
+      </div>
+
+      <!-- Attachment -->
+      <div class="form-group">
+        <label class="form-label">Attachment <span style="color:var(--text-3);font-size:10px;">(optional)</span></label>
+        <div class="attach-drop-zone" id="drop-zone" onclick="document.getElementById('attach-input').click()">
+          <div class="attach-idle" id="attach-idle">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3); margin-bottom:8px;">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+            <span style="color:var(--text-2); font-size:13px;">Click to attach a file</span>
+            <span style="color:var(--text-3); font-size:11px; margin-top:4px;">Any file type · Max 20 MB</span>
+          </div>
+          <div class="attach-preview" id="attach-preview" style="display:none;">
+            <div class="attach-file-chip" id="attach-chip">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent); flex-shrink:0;">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span id="attach-name" style="font-size:13px; color:var(--text-1);"></span>
+              <span id="attach-size" style="font-size:11px; color:var(--text-3);"></span>
+              <button type="button" onclick="clearAttachment(event)" style="background:none;border:none;cursor:pointer;color:var(--text-3);padding:2px 4px;margin-left:auto;font-size:14px;" title="Remove">✕</button>
+            </div>
+          </div>
+        </div>
+        <input type="file" name="attachment" id="attach-input" style="display:none" onchange="previewAttachment(this)">
+      </div>
+
+      <div class="flex gap-12" style="justify-content:flex-end;">
+        <a href="{{ url_for('view_messages') }}" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          Send Message
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.attach-drop-zone {
+  border: 1.5px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  text-align: center;
+}
+.attach-drop-zone:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.attach-idle { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.attach-file-chip {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); padding: 10px 14px; width: 100%;
+}
+</style>
+
+<script>
+function previewAttachment(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  document.getElementById('attach-idle').style.display   = 'none';
+  document.getElementById('attach-preview').style.display = 'block';
+  document.getElementById('attach-name').textContent = file.name;
+  const mb = (file.size / 1024 / 1024).toFixed(2);
+  document.getElementById('attach-size').textContent = `${mb} MB`;
+}
+function clearAttachment(e) {
+  e.stopPropagation();
+  document.getElementById('attach-input').value = '';
+  document.getElementById('attach-idle').style.display    = 'flex';
+  document.getElementById('attach-preview').style.display = 'none';
+}
+// Drag and drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'var(--accent-dim)'; });
+dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; dz.style.background = ''; });
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.style.borderColor = ''; dz.style.background = '';
+  const fi = document.getElementById('attach-input');
+  fi.files = e.dataTransfer.files;
+  previewAttachment(fi);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Cipher{% endblock %}
+{% block content %}
+
+<div class="page-header flex-between">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Good to see you, {{ profile.display_name if profile else session.user_name }} ✦</p>
+  </div>
+  <a href="{{ url_for('send_message') }}" class="btn btn-primary">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="22" y1="2" x2="11" y2="13"/>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+    Compose
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div class="stat-label">Received</div>
+    <div class="stat-value">{{ received_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="color:var(--teal)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </div>
+    <div class="stat-label">Sent</div>
+    <div class="stat-value">{{ sent_count }}</div>
+  </div>
+  <div class="stat-card" style="cursor:pointer;" onclick="location.href='{{ url_for('view_messages') }}'">
+    <div class="stat-icon" style="color:var(--green)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div class="stat-label">Total Activity</div>
+    <div class="stat-value">{{ received_count + sent_count }}</div>
+  </div>
+</div>
+
+<!-- Recent -->
+<div class="card">
+  <div class="flex-between" style="margin-bottom:20px;">
+    <span class="section-title" style="margin-bottom:0;">Recent Inbox</span>
+    <a href="{{ url_for('view_messages') }}" class="btn btn-ghost btn-sm">View all</a>
+  </div>
+
+  {% if recent %}
+    <div class="recent-list">
+      {% for msg in recent %}
+      <a href="{{ url_for('view_messages') }}" class="recent-item">
+        <div class="recent-avatar">{{ msg.from[0]|upper }}</div>
+        <div class="recent-info">
+          <div class="recent-from">@{{ msg.from }}</div>
+          <div class="recent-preview">{{ msg.preview }}</div>
+        </div>
+        <div class="recent-date">{{ msg.date }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <p>No messages yet. <a href="{{ url_for('send_message') }}" class="auth-link">Send one?</a></p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Sign In — Mini Mail{% endblock %}
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+      </div>
+      <span class="auth-logo-text">Mini Mail</span>
+    </div>
+
+    <h2 class="auth-title">Welcome back</h2>
+    <p class="auth-subtitle">Sign in to your account to continue</p>
+
+    <div class="card">
+      <form method="post" autocomplete="off">
+        <!-- honeypot -->
+        <input type="text" name="fake_user" style="display:none" tabindex="-1">
+        <div class="form-group">
+          <label class="form-label">User ID</label>
+          <input type="text" name="user_id" class="form-control" placeholder="your_user_id" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-control" placeholder="••••••••" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">
+          Sign In
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+    <p class="text-sm text-muted mt-16" style="text-align:center;">
+      Don't have an account? <a href="{{ url_for('signup') }}" class="auth-link">Sign up</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
