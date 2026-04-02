@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Cipher Mail
 
 A dark, sleek private messaging web app built with Flask + MySQL.
@@ -74,3 +75,6 @@ minimail/
 | Delete account | No password confirm | Requires password confirmation |
 | Frontend | Bootstrap default | Custom dark design system |
 | Receiver lookup | None | Live AJAX user lookup on compose |
+=======
+# Mini-Mail
+>>>>>>> 3a547eccf3cb1dbbd849ea3c6896c63e2ba81fab
