@@ -158,9 +158,11 @@ def test_delete_account_db_fail(mock_connect, mock_profile, logged_in_client):
 
 # ---------------- API ERROR EDGE ----------------
 
-@patch('app.get_user_profile', side_effect=Exception("fail"))
-def test_api_exception(mock_profile, logged_in_client):
+@patch('app.get_user_profile')
+def test_api_user_none(mock_profile, logged_in_client):
+
+    mock_profile.return_value = None
 
     response = logged_in_client.get('/api/user/test')
 
-    assert response.status_code in [200, 500]
+    assert response.status_code == 404
