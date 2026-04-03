@@ -37,7 +37,7 @@ pipeline {
         stage('Run Tests') {
             steps {
                 bat 'python -m pip install pytest'
-                bat 'python -m pytest'
+                bat 'python -m pytest --cov=app --cov-report=term-missing'
             }
         }
     }
