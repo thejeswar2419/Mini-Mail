@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Profile — Mini Mail{% endblock %}
 {% block content %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
 <div class="page-header">
   <h1>Profile</h1>
@@ -46,8 +48,7 @@
 
     <form method="post" enctype="multipart/form-data" id="avatar-form">
       <input type="hidden" name="action" value="upload_avatar">
-      <input type="file" id="avatar-file" name="avatar" accept="image/*" style="display:none"
-             onchange="document.getElementById('avatar-form').submit()">
+      <input type="file" id="avatar-file" name="avatar" accept="image/*" style="display:none">
     </form>
 
     <!-- Sign out button inside profile -->
@@ -161,7 +162,80 @@
   </div>
 </div>
 
+<!-- Cropper Modal -->
+<div class="modal-overlay" id="cropper-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:500px;text-align:center;">
+    <div class="modal-header">
+      <span class="modal-title" style="color:var(--text-1)">Adjust Profile Picture</span>
+      <button type="button" class="modal-close" onclick="closeCropper()">✕</button>
+    </div>
+    <div style="width: 100%; max-height: 400px; margin-bottom: 20px;">
+      <img id="cropper-image" style="max-width: 100%; display: block;">
+    </div>
+    <div class="flex gap-12" style="justify-content:flex-end;">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeCropper()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="crop-btn" onclick="applyCrop()">Crop & Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
+let cropper;
+
+document.getElementById('avatar-file').addEventListener('change', function (e) {
+  const files = e.target.files;
+  if (files && files.length > 0) {
+    const file = files[0];
+    const url = URL.createObjectURL(file);
+    const image = document.getElementById('cropper-image');
+    image.src = url;
+    document.getElementById('cropper-modal').classList.add('open');
+    
+    if (cropper) { cropper.destroy(); }
+    cropper = new Cropper(image, {
+      aspectRatio: 1,
+      viewMode: 1,
+      dragMode: 'move',
+      autoCropArea: 1,
+      cropBoxMovable: true,
+      cropBoxResizable: true,
+      toggleDragModeOnDblclick: false,
+    });
+  }
+});
+
+function closeCropper() {
+  document.getElementById('cropper-modal').classList.remove('open');
+  if (cropper) { cropper.destroy(); cropper = null; }
+  document.getElementById('avatar-file').value = '';
+}
+
+function applyCrop() {
+  if (!cropper) return;
+  const btn = document.getElementById('crop-btn');
+  btn.innerText = 'Saving...';
+  btn.disabled = true;
+
+  cropper.getCroppedCanvas({ width: 400, height: 400 }).toBlob((blob) => {
+    const formData = new FormData();
+    formData.append('action', 'upload_avatar');
+    formData.append('avatar', blob, 'avatar.png');
+
+    fetch(window.location.href, {
+      method: 'POST',
+      body: formData,
+    }).then(res => {
+      window.location.reload();
+    }).catch(err => {
+      console.error(err);
+      alert('Upload failed');
+      closeCropper();
+      btn.innerText = 'Crop & Save';
+      btn.disabled = false;
+    });
+  });
+}
+
 function togglePasswordSection() {
   const s = document.getElementById('pw-section');
   const c = document.getElementById('pw-chevron');

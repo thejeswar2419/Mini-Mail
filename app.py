@@ -365,10 +365,20 @@ def profile():
                 ext      = file.filename.rsplit(".", 1)[1].lower()
                 filename = secure_filename(f"{uid}_avatar.{ext}")
                 save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file.save(save_path)
+                
                 try:
-                    con = connect_server(); cur = con.cursor()
+                    con = connect_server(); cur = con.cursor(dictionary=True)
                     cur.execute("USE mail")
+                    
+                    # Remove old avatar if it exists (in case extension is different)
+                    cur.execute("SELECT avatar FROM userdetails WHERE user_ID=%s", (uid,))
+                    row = cur.fetchone()
+                    if row and row['avatar'] and row['avatar'] != filename:
+                        old_path = os.path.join(app.config["UPLOAD_FOLDER"], row['avatar'])
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+
+                    file.save(save_path)
                     cur.execute("UPDATE userdetails SET avatar=%s WHERE user_ID=%s", (filename, uid))
                     con.commit()
                     flash("Profile picture updated.", "success")
@@ -381,8 +391,17 @@ def profile():
         # --- Delete avatar ---
         elif action == "delete_avatar":
             try:
-                con = connect_server(); cur = con.cursor()
+                con = connect_server(); cur = con.cursor(dictionary=True)
                 cur.execute("USE mail")
+                
+                # Fetch current avatar to delete from disk
+                cur.execute("SELECT avatar FROM userdetails WHERE user_ID=%s", (uid,))
+                row = cur.fetchone()
+                if row and row['avatar']:
+                    old_path = os.path.join(app.config["UPLOAD_FOLDER"], row['avatar'])
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                
                 cur.execute("UPDATE userdetails SET avatar=NULL WHERE user_ID=%s", (uid,))
                 con.commit()
                 flash("Profile picture removed.", "success")
