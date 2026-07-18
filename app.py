@@ -19,6 +19,7 @@ load_dotenv()
 DB_HOST     = os.getenv("DB_HOST", "localhost")
 DB_USER     = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_PORT     = os.getenv("DB_PORT", "3306")
 
 UPLOAD_FOLDER      = os.path.join(os.path.dirname(__file__), "static", "uploads")
 ATTACH_FOLDER      = os.path.join(os.path.dirname(__file__), "static", "attachments")
@@ -40,7 +41,7 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def connect_server():
-    return m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
+    return m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, port=int(DB_PORT))
 
 def validate_user_id(user_id: str) -> bool:
     # Only block characters that would break MySQL database names
