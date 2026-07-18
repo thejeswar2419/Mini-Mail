@@ -6,7 +6,7 @@ from flask import (
     Flask, render_template, request, redirect,
     url_for, flash, session, send_from_directory
 )
-import mysql.connector as m
+import sqlite3
 from datetime import datetime
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,16 +16,13 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 load_dotenv()
 
-DB_HOST     = os.getenv("DB_HOST", "localhost")
-DB_USER     = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_PORT     = os.getenv("DB_PORT", "3306")
-
+DB_FOLDER          = os.path.join(os.path.dirname(__file__), "database")
 UPLOAD_FOLDER      = os.path.join(os.path.dirname(__file__), "static", "uploads")
 ATTACH_FOLDER      = os.path.join(os.path.dirname(__file__), "static", "attachments")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 MAX_CONTENT_LENGTH = 20 * 1024 * 1024  # 20 MB
 
+os.makedirs(DB_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ATTACH_FOLDER, exist_ok=True)
 
@@ -40,11 +37,14 @@ app.config["ATTACH_FOLDER"] = ATTACH_FOLDER
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def connect_server():
-    return m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, port=int(DB_PORT))
+def connect_db(db_name="mail"):
+    db_path = os.path.join(DB_FOLDER, f"{db_name}.db")
+    con = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    con.row_factory = sqlite3.Row
+    return con
 
 def validate_user_id(user_id: str) -> bool:
-    # Only block characters that would break MySQL database names
+    # Only block characters that would break files/databases
     return len(user_id) >= 1 and len(user_id) <= 50 and '`' not in user_id and '/' not in user_id and '\\' not in user_id
 
 def current_user_id():
@@ -57,14 +57,13 @@ def is_logged_in():
     return "user_id" in session
 
 def get_user_profile(uid):
-    """Fetch full profile row from mail.userdetails."""
+    """Fetch full profile row from mail.db"""
     try:
-        con = connect_server()
-        cur = con.cursor(dictionary=True)
-        cur.execute("USE mail")
-        cur.execute("SELECT * FROM userdetails WHERE user_ID = %s", (uid,))
+        con = connect_db()
+        cur = con.cursor()
+        cur.execute("SELECT * FROM userdetails WHERE user_ID = ?", (uid,))
         row = cur.fetchone()
-        return row
+        return dict(row) if row else None
     except:
         return None
     finally:
@@ -81,54 +80,35 @@ def inject_globals():
 # ----------------- DB INIT -----------------
 
 def initialize_system():
-    import time
-    for attempt in range(15):
-        try:
-            con = connect_server()
-            cur = con.cursor()
+    try:
+        con = connect_db("mail")
+        cur = con.cursor()
 
-            cur.execute("CREATE DATABASE IF NOT EXISTS mail")
-            cur.execute("USE mail")
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS userdetails (
-                    user_ID     VARCHAR(30)  PRIMARY KEY,
-                    name        VARCHAR(60)  NOT NULL,
-                    display_name VARCHAR(60) DEFAULT NULL,
-                    mobile_no   VARCHAR(20)  DEFAULT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    avatar      VARCHAR(255) DEFAULT NULL,
-                    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            # Migration: add display_name / avatar if upgrading from old schema
-            for col, defn in [
-                ("display_name", "VARCHAR(60) DEFAULT NULL AFTER name"),
-                ("avatar",       "VARCHAR(255) DEFAULT NULL AFTER password_hash"),
-                ("created_at",   "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-            ]:
-                try:
-                    cur.execute(f"ALTER TABLE userdetails ADD COLUMN {col} {defn}")
-                except:
-                    pass
-
-            con.commit()
-            cur.close()
-            con.close()
-            print("Database initialized successfully.")
-            return
-        except Exception as e:
-            print(f"DB init error on attempt {attempt+1}: {e}")
-            time.sleep(2)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS userdetails (
+                user_ID       VARCHAR(30)  PRIMARY KEY,
+                name          VARCHAR(60)  NOT NULL,
+                display_name  VARCHAR(60)  DEFAULT NULL,
+                mobile_no     VARCHAR(20)  DEFAULT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                avatar        VARCHAR(255) DEFAULT NULL,
+                created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        con.commit()
+        cur.close()
+        con.close()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"DB init error: {e}")
 
 def create_user_db(uid):
     try:
-        con = connect_server()
+        con = connect_db(uid)
         cur = con.cursor()
-        cur.execute(f"CREATE DATABASE IF NOT EXISTS `{uid}`")
-        cur.execute(f"USE `{uid}`")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS messages_sent(
-                id           INT AUTO_INCREMENT PRIMARY KEY,
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 date         DATETIME,
                 sent_to      VARCHAR(50),
                 sent_message TEXT,
@@ -137,19 +117,13 @@ def create_user_db(uid):
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS messages_received(
-                id                INT AUTO_INCREMENT PRIMARY KEY,
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
                 date              DATETIME,
                 received_from     VARCHAR(50),
                 received_message  TEXT,
                 attachment        VARCHAR(255) DEFAULT NULL
             )
         """)
-        # Migration: add attachment column if upgrading
-        for tbl in ("messages_sent", "messages_received"):
-            try:
-                cur.execute(f"ALTER TABLE `{tbl}` ADD COLUMN attachment VARCHAR(255) DEFAULT NULL")
-            except:
-                pass
         con.commit()
     finally:
         try: cur.close(); con.close()
@@ -194,17 +168,17 @@ def signup():
             return redirect(url_for("signup"))
 
         try:
-            con = connect_server()
+            con = connect_db()
             cur = con.cursor()
-            cur.execute("USE mail")
-            cur.execute("SELECT user_ID FROM userdetails WHERE user_ID = %s", (user_id,))
+            
+            cur.execute("SELECT user_ID FROM userdetails WHERE user_ID = ?", (user_id,))
             if cur.fetchone():
                 flash("That User ID is already taken.", "error")
                 return redirect(url_for("signup"))
 
             pw_hash = generate_password_hash(password)
             cur.execute(
-                "INSERT INTO userdetails (user_ID, name, display_name, mobile_no, password_hash) VALUES (%s,%s,%s,%s,%s)",
+                "INSERT INTO userdetails (user_ID, name, display_name, mobile_no, password_hash) VALUES (?,?,?,?,?)",
                 (user_id, name, name, phone or None, pw_hash)
             )
             con.commit()
@@ -236,10 +210,10 @@ def login():
             return redirect(url_for("login"))
 
         try:
-            con = connect_server()
+            con = connect_db()
             cur = con.cursor()
-            cur.execute("USE mail")
-            cur.execute("SELECT name, password_hash FROM userdetails WHERE user_ID = %s", (u_id,))
+            
+            cur.execute("SELECT name, password_hash FROM userdetails WHERE user_ID = ?", (u_id,))
             row = cur.fetchone()
         except Exception as e:
             flash(f"Database error: {e}", "error")
@@ -276,7 +250,7 @@ def dashboard():
     sent_count = 0
     recent = []
     try:
-        con = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=uid)
+        con = connect_db(uid)
         cur = con.cursor()
         cur.execute("SELECT COUNT(*) FROM messages_received")
         received_count = cur.fetchone()[0]
@@ -316,9 +290,9 @@ def profile():
                 flash("Display name cannot be empty.", "error")
             else:
                 try:
-                    con = connect_server(); cur = con.cursor()
-                    cur.execute("USE mail")
-                    cur.execute("UPDATE userdetails SET display_name=%s WHERE user_ID=%s", (display_name, uid))
+                    con = connect_db(); cur = con.cursor()
+                    
+                    cur.execute("UPDATE userdetails SET display_name=? WHERE user_ID=?", (display_name, uid))
                     con.commit()
                     session["user_name"] = display_name
                     flash("Display name updated.", "success")
@@ -343,9 +317,9 @@ def profile():
                 flash("New passwords do not match.", "error")
             else:
                 try:
-                    con = connect_server(); cur = con.cursor()
-                    cur.execute("USE mail")
-                    cur.execute("UPDATE userdetails SET password_hash=%s WHERE user_ID=%s",
+                    con = connect_db(); cur = con.cursor()
+                    
+                    cur.execute("UPDATE userdetails SET password_hash=? WHERE user_ID=?",
                                 (generate_password_hash(new_pw), uid))
                     con.commit()
                     flash("Password changed successfully.", "success")
@@ -368,11 +342,11 @@ def profile():
                 save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
                 
                 try:
-                    con = connect_server(); cur = con.cursor(dictionary=True)
-                    cur.execute("USE mail")
+                    con = connect_db(); cur = con.cursor()
+                    
                     
                     # Remove old avatar if it exists (in case extension is different)
-                    cur.execute("SELECT avatar FROM userdetails WHERE user_ID=%s", (uid,))
+                    cur.execute("SELECT avatar FROM userdetails WHERE user_ID=?", (uid,))
                     row = cur.fetchone()
                     if row and row['avatar'] and row['avatar'] != filename:
                         old_path = os.path.join(app.config["UPLOAD_FOLDER"], row['avatar'])
@@ -380,7 +354,7 @@ def profile():
                             os.remove(old_path)
 
                     file.save(save_path)
-                    cur.execute("UPDATE userdetails SET avatar=%s WHERE user_ID=%s", (filename, uid))
+                    cur.execute("UPDATE userdetails SET avatar=? WHERE user_ID=?", (filename, uid))
                     con.commit()
                     flash("Profile picture updated.", "success")
                 except Exception as e:
@@ -392,18 +366,18 @@ def profile():
         # --- Delete avatar ---
         elif action == "delete_avatar":
             try:
-                con = connect_server(); cur = con.cursor(dictionary=True)
-                cur.execute("USE mail")
+                con = connect_db(); cur = con.cursor()
+                
                 
                 # Fetch current avatar to delete from disk
-                cur.execute("SELECT avatar FROM userdetails WHERE user_ID=%s", (uid,))
+                cur.execute("SELECT avatar FROM userdetails WHERE user_ID=?", (uid,))
                 row = cur.fetchone()
                 if row and row['avatar']:
                     old_path = os.path.join(app.config["UPLOAD_FOLDER"], row['avatar'])
                     if os.path.exists(old_path):
                         os.remove(old_path)
                 
-                cur.execute("UPDATE userdetails SET avatar=NULL WHERE user_ID=%s", (uid,))
+                cur.execute("UPDATE userdetails SET avatar=NULL WHERE user_ID=?", (uid,))
                 con.commit()
                 flash("Profile picture removed.", "success")
             except Exception as e:
@@ -459,9 +433,9 @@ def send_message():
 
         # Verify receiver exists
         try:
-            con = connect_server(); cur = con.cursor()
-            cur.execute("USE mail")
-            cur.execute("SELECT user_ID FROM userdetails WHERE user_ID = %s", (receiver,))
+            con = connect_db(); cur = con.cursor()
+            
+            cur.execute("SELECT user_ID FROM userdetails WHERE user_ID = ?", (receiver,))
             if not cur.fetchone():
                 flash(f"User '{receiver}' not found.", "error")
                 return redirect(url_for("send_message"))
@@ -487,9 +461,9 @@ def send_message():
 
         # Save to sender DB
         try:
-            con = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=sender_id)
+            con = connect_db(sender_id)
             cur = con.cursor()
-            cur.execute("INSERT INTO messages_sent (date, sent_to, sent_message, attachment) VALUES (%s,%s,%s,%s)",
+            cur.execute("INSERT INTO messages_sent (date, sent_to, sent_message, attachment) VALUES (?,?,?,?)",
                         (now, receiver, message, attachment_filename))
             con.commit()
         except Exception as e:
@@ -501,9 +475,9 @@ def send_message():
 
         # Save to receiver DB
         try:
-            con = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=receiver)
+            con = connect_db(receiver)
             cur = con.cursor()
-            cur.execute("INSERT INTO messages_received (date, received_from, received_message, attachment) VALUES (%s,%s,%s,%s)",
+            cur.execute("INSERT INTO messages_received (date, received_from, received_message, attachment) VALUES (?,?,?,?)",
                         (now, sender_id, message, attachment_filename))
             con.commit()
         except Exception as e:
@@ -528,7 +502,7 @@ def view_messages():
     received, sent = [], []
 
     try:
-        con = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=uid)
+        con = connect_db(uid)
         cur = con.cursor()
         cur.execute("SELECT id, date, received_from, received_message, attachment FROM messages_received ORDER BY date DESC")
         for row in cur.fetchall():
@@ -568,25 +542,25 @@ def delete_message():
         return redirect(url_for("view_messages"))
 
     try:
-        con = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=uid)
+        con = connect_db(uid)
         cur = con.cursor()
 
         if box_type == "received":
-            cur.execute("DELETE FROM messages_received WHERE id = %s", (msg_id,))
+            cur.execute("DELETE FROM messages_received WHERE id = ?", (msg_id,))
             con.commit()
             flash("Message deleted.", "success")
 
         elif box_type == "sent":
-            cur.execute("SELECT date, sent_to, sent_message FROM messages_sent WHERE id = %s", (msg_id,))
+            cur.execute("SELECT date, sent_to, sent_message FROM messages_sent WHERE id = ?", (msg_id,))
             row = cur.fetchone()
             if row:
-                cur.execute("DELETE FROM messages_sent WHERE id = %s", (msg_id,))
+                cur.execute("DELETE FROM messages_sent WHERE id = ?", (msg_id,))
                 con.commit()
                 date_val, receiver_id, msg_body = row
                 try:
-                    con2 = m.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=receiver_id)
+                    con2 = connect_db(receiver_id)
                     cur2 = con2.cursor()
-                    cur2.execute("DELETE FROM messages_received WHERE date=%s AND received_from=%s AND received_message=%s",
+                    cur2.execute("DELETE FROM messages_received WHERE date=? AND received_from=? AND received_message=?",
                                  (date_val, uid, msg_body))
                     con2.commit()
                     cur2.close(); con2.close()
@@ -616,11 +590,12 @@ def delete_account():
         return redirect(url_for("profile"))
 
     try:
-        con = connect_server(); cur = con.cursor()
-        cur.execute("USE mail")
-        cur.execute("DELETE FROM userdetails WHERE user_ID = %s", (uid,))
+        con = connect_db(); cur = con.cursor()
+        
+        cur.execute("DELETE FROM userdetails WHERE user_ID = ?", (uid,))
         con.commit()
-        cur.execute(f"DROP DATABASE IF EXISTS `{uid}`")
+        try: os.remove(os.path.join(DB_FOLDER, f"{uid}.db"))
+        except: pass
         con.commit()
         session.clear()
         flash("Your account has been permanently deleted.", "success")

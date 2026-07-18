@@ -2,9 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies (often needed for cryptography and mysql)
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y default-libmysqlclient-dev build-essential pkg-config && \
+    apt-get install -y pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
