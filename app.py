@@ -70,6 +70,12 @@ def get_user_profile(uid):
         try: cur.close(); con.close()
         except: pass
 
+@app.before_request
+def check_stale_session():
+    if is_logged_in() and not get_user_profile(current_user_id()):
+        session.clear()
+        flash("Your session expired because the server restarted.", "error")
+
 @app.context_processor
 def inject_globals():
     profile = None
