@@ -165,16 +165,15 @@
 <!-- Cropper Modal -->
 <div class="modal-overlay" id="cropper-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:500px;text-align:center;">
-    <div class="modal-header">
-      <span class="modal-title" style="color:var(--text-1)">Adjust Profile Picture</span>
-      <button type="button" class="modal-close" onclick="closeCropper()">✕</button>
+    <div class="modal-header" style="align-items:center;">
+      <span class="modal-title" style="color:var(--text-1)">Adjust Profile</span>
+      <div class="flex gap-8" style="align-items:center;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeCropper()">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="crop-btn" onclick="applyCrop()">Crop & Save</button>
+      </div>
     </div>
-    <div style="width: 100%; max-height: 400px; margin-bottom: 20px;">
+    <div style="width: 100%; max-height: 400px;">
       <img id="cropper-image" style="max-width: 100%; display: block;">
-    </div>
-    <div class="flex gap-12" style="justify-content:flex-end;">
-      <button type="button" class="btn btn-ghost btn-sm" onclick="closeCropper()">Cancel</button>
-      <button type="button" class="btn btn-primary btn-sm" id="crop-btn" onclick="applyCrop()">Crop & Save</button>
     </div>
   </div>
 </div>
