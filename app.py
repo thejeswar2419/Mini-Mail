@@ -608,4 +608,5 @@ def api_user(uid):
 
 # ----------------- MAIN -----------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
+    app.run(host="0.0.0.0", debug=debug_mode)

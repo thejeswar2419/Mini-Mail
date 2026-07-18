@@ -43,6 +43,19 @@ Visit `http://localhost:5000`
 flask run --host=0.0.0.0 --port=5000
 ```
 
+## Production Deployment (Docker)
+
+To run the application in a production-ready environment using Docker and Gunicorn:
+
+1. Ensure you have Docker and Docker Compose installed.
+2. In the project directory, create a `.env` file with your credentials (see above).
+3. Run the following command:
+```bash
+docker-compose up -d --build
+```
+
+This will spin up both the Flask application (using Gunicorn) and a MySQL database container. The application will be available at `http://localhost:5000`.
+
 ## Project Structure
 ```
 minimail/
