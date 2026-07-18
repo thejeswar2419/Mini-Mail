@@ -63,7 +63,12 @@ def get_user_profile(uid):
         cur = con.cursor()
         cur.execute("SELECT * FROM userdetails WHERE user_ID = ?", (uid,))
         row = cur.fetchone()
-        return dict(row) if row else None
+        if not row: return None
+        d = dict(row)
+        if isinstance(d.get('created_at'), str):
+            try: d['created_at'] = datetime.strptime(d['created_at'], '%Y-%m-%d %H:%M:%S')
+            except ValueError: pass
+        return d
     except:
         return None
     finally:
