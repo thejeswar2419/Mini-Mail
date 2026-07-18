@@ -13,7 +13,17 @@
   <div class="card" style="text-align:center;">
     <div class="avatar-wrap" style="margin:0 auto 16px;">
       {% if profile and profile.avatar %}
-        <img src="{{ url_for('uploaded_file', filename=profile.avatar) }}" class="avatar-img" alt="avatar">
+        <img src="{{ url_for('uploaded_file', filename=profile.avatar) }}" class="avatar-img" alt="avatar" style="object-position: center;">
+        
+        <form method="post" style="display:inline;">
+          <input type="hidden" name="action" value="delete_avatar">
+          <button type="submit" class="avatar-delete-btn" title="Remove photo" onclick="return confirm('Are you sure you want to remove your profile picture?');">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </form>
       {% else %}
         <div class="avatar-default">{{ (profile.display_name or session.user_id)[0]|upper }}</div>
       {% endif %}

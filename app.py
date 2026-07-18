@@ -80,40 +80,44 @@ def inject_globals():
 # ----------------- DB INIT -----------------
 
 def initialize_system():
-    try:
-        con = connect_server()
-        cur = con.cursor()
+    import time
+    for attempt in range(15):
+        try:
+            con = connect_server()
+            cur = con.cursor()
 
-        cur.execute("CREATE DATABASE IF NOT EXISTS mail")
-        cur.execute("USE mail")
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS userdetails (
-                user_ID     VARCHAR(30)  PRIMARY KEY,
-                name        VARCHAR(60)  NOT NULL,
-                display_name VARCHAR(60) DEFAULT NULL,
-                mobile_no   VARCHAR(20)  DEFAULT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                avatar      VARCHAR(255) DEFAULT NULL,
-                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        # Migration: add display_name / avatar if upgrading from old schema
-        for col, defn in [
-            ("display_name", "VARCHAR(60) DEFAULT NULL AFTER name"),
-            ("avatar",       "VARCHAR(255) DEFAULT NULL AFTER password_hash"),
-            ("created_at",   "DATETIME DEFAULT CURRENT_TIMESTAMP"),
-        ]:
-            try:
-                cur.execute(f"ALTER TABLE userdetails ADD COLUMN {col} {defn}")
-            except:
-                pass
+            cur.execute("CREATE DATABASE IF NOT EXISTS mail")
+            cur.execute("USE mail")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS userdetails (
+                    user_ID     VARCHAR(30)  PRIMARY KEY,
+                    name        VARCHAR(60)  NOT NULL,
+                    display_name VARCHAR(60) DEFAULT NULL,
+                    mobile_no   VARCHAR(20)  DEFAULT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    avatar      VARCHAR(255) DEFAULT NULL,
+                    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Migration: add display_name / avatar if upgrading from old schema
+            for col, defn in [
+                ("display_name", "VARCHAR(60) DEFAULT NULL AFTER name"),
+                ("avatar",       "VARCHAR(255) DEFAULT NULL AFTER password_hash"),
+                ("created_at",   "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            ]:
+                try:
+                    cur.execute(f"ALTER TABLE userdetails ADD COLUMN {col} {defn}")
+                except:
+                    pass
 
-        con.commit()
-    except Exception as e:
-        print("DB init error:", e)
-    finally:
-        try: cur.close(); con.close()
-        except: pass
+            con.commit()
+            cur.close()
+            con.close()
+            print("Database initialized successfully.")
+            return
+        except Exception as e:
+            print(f"DB init error on attempt {attempt+1}: {e}")
+            time.sleep(2)
 
 def create_user_db(uid):
     try:
@@ -373,6 +377,20 @@ def profile():
                 finally:
                     try: cur.close(); con.close()
                     except: pass
+
+        # --- Delete avatar ---
+        elif action == "delete_avatar":
+            try:
+                con = connect_server(); cur = con.cursor()
+                cur.execute("USE mail")
+                cur.execute("UPDATE userdetails SET avatar=NULL WHERE user_ID=%s", (uid,))
+                con.commit()
+                flash("Profile picture removed.", "success")
+            except Exception as e:
+                flash(f"Error removing avatar: {e}", "error")
+            finally:
+                try: cur.close(); con.close()
+                except: pass
 
         return redirect(url_for("profile"))
 
