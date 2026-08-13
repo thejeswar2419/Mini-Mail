@@ -6,10 +6,37 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD:-thejeswar}
+      - DB_NAME=minimail
+      - SECRET_KEY=${SECRET_KEY:-my_super_secret_key_123}
       - FLASK_DEBUG=False
     volumes:
       - ./static/uploads:/app/static/uploads
       - ./static/attachments:/app/static/attachments
-      - ./database:/app/database
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-thejeswar}
+      - MYSQL_DATABASE=minimail
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

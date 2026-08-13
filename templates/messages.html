@@ -26,41 +26,93 @@
   {% if received %}
     <div class="msg-list">
       {% for msg in received %}
-      <div class="msg-row" onclick="openModal('recv-{{ loop.index }}')">
+      {% set reply_subj = 'Re: ' ~ msg.subject if not (msg.subject and msg.subject.lower().startswith('re:')) else msg.subject %}
+      <div class="msg-row {% if not msg.is_read %}unread-row{% endif %}" onclick="openInboxModal('recv-{{ loop.index }}', {{ msg.id }}, {{ 'true' if not msg.is_read else 'false' }})">
         <div style="min-width:0;">
-          <div class="msg-meta">From <strong>@{{ msg.from }}</strong>
+          <div class="msg-meta">
+            From <strong>@{{ msg.from }}</strong>
+            {% if not msg.is_read %}
+              <span class="status-badge badge-unread" id="badge-{{ msg.id }}">New</span>
+            {% else %}
+              <span class="status-badge badge-read">Read</span>
+            {% endif %}
             {% if msg.attachment %}<span class="attach-badge">📎</span>{% endif %}
           </div>
+          <div class="msg-subject">{{ msg.subject }}</div>
           <div class="msg-preview">{{ msg.preview if msg.preview else '(no text)' }}</div>
         </div>
-        <div class="msg-actions">
+        <div class="msg-actions" style="display:flex; align-items:center; gap:8px;">
           <span class="msg-date">{{ msg.date }}</span>
-          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete this message?');">
+          <a href="{{ url_for('send_message', to=msg.from, subject=reply_subj) }}" class="btn btn-ghost btn-sm" title="Reply to @{{ msg.from }}" onclick="event.stopPropagation()" style="padding: 4px 8px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 17 4 12 9 7"/>
+              <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+            </svg>
+            Reply
+          </a>
+          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete this message from your Inbox?');">
             <input type="hidden" name="msg_id" value="{{ msg.id }}">
             <input type="hidden" name="box_type" value="received">
-            <button class="btn btn-danger btn-sm">
+            <button class="btn btn-danger btn-sm" title="Delete">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
             </button>
           </form>
         </div>
       </div>
 
+      <!-- Inbox Message Modal -->
       <div class="modal-overlay" id="recv-{{ loop.index }}">
         <div class="modal" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <span class="modal-title">Message from @{{ msg.from }}</span>
+            <div>
+              <span class="modal-title">Message from @{{ msg.from }}</span>
+              <div class="modal-subj-header">{{ msg.subject }}</div>
+            </div>
             <button class="modal-close" onclick="closeModal('recv-{{ loop.index }}')">✕</button>
           </div>
           <div class="modal-meta">{{ msg.date }}</div>
           {% if msg.full %}<div class="modal-body-text">{{ msg.full }}</div>{% endif %}
+
+          <!-- Gmail-Style Attachment Card -->
           {% if msg.attachment %}
-            <div class="modal-attachment">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              <a href="{{ url_for('download_attachment', filename=msg.attachment) }}" class="auth-link" onclick="event.stopPropagation()">
-                {{ msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment }}
-              </a>
+            {% set fname = msg.attachment_name or (msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment) %}
+            {% set ext = (fname.split('.')[-1] | lower) if '.' in fname else 'file' %}
+            {% set is_img = ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+            <div class="gmail-attachment-card">
+              {% if is_img %}
+                <div class="gmail-attach-preview-box">
+                  <img src="{{ url_for('download_attachment', attachment_id=msg.id) }}" alt="{{ fname }}" class="gmail-attach-thumb" />
+                </div>
+              {% endif %}
+              <div class="gmail-attach-info">
+                <div class="gmail-attach-icon-badge badge-ext-{{ ext }}">
+                  {{ ext[:4] | upper }}
+                </div>
+                <div class="gmail-attach-details">
+                  <div class="gmail-attach-filename" title="{{ fname }}">{{ fname }}</div>
+                  <div class="gmail-attach-sub">Attachment</div>
+                </div>
+                <a href="{{ url_for('download_attachment', attachment_id=msg.id) }}" class="gmail-attach-download-btn" title="Download {{ fname }}" onclick="event.stopPropagation()" download>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </a>
+              </div>
             </div>
           {% endif %}
+
+          <div style="margin-top:24px; border-top: 1px solid var(--border); padding-top: 16px; display:flex; justify-content:space-between; align-items:center;">
+            <a href="{{ url_for('send_message', to=msg.from, subject=reply_subj) }}" class="btn btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 17 4 12 9 7"/>
+                <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+              </svg>
+              Reply to @{{ msg.from }}
+            </a>
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('recv-{{ loop.index }}')">Close</button>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -80,39 +132,76 @@
       {% for msg in sent %}
       <div class="msg-row" onclick="openModal('sent-{{ loop.index }}')">
         <div style="min-width:0;">
-          <div class="msg-meta">To <strong>@{{ msg.to }}</strong>
+          <div class="msg-meta">
+            To <strong>@{{ msg.to }}</strong>
+            {% if msg.is_read %}
+              <span class="status-badge badge-read">Seen</span>
+            {% else %}
+              <span class="status-badge badge-sent">Delivered</span>
+            {% endif %}
             {% if msg.attachment %}<span class="attach-badge">📎</span>{% endif %}
           </div>
+          <div class="msg-subject">{{ msg.subject }}</div>
           <div class="msg-preview">{{ msg.preview if msg.preview else '(no text)' }}</div>
         </div>
         <div class="msg-actions">
           <span class="msg-date">{{ msg.date }}</span>
-          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete for you and receiver?');">
+          <form method="post" action="{{ url_for('delete_message') }}" onclick="event.stopPropagation()" onsubmit="return confirm('Delete this message from your Sent box?');">
             <input type="hidden" name="msg_id" value="{{ msg.id }}">
             <input type="hidden" name="box_type" value="sent">
-            <button class="btn btn-danger btn-sm">
+            <button class="btn btn-danger btn-sm" title="Delete">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
             </button>
           </form>
         </div>
       </div>
 
+      <!-- Sent Message Modal -->
       <div class="modal-overlay" id="sent-{{ loop.index }}">
         <div class="modal" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <span class="modal-title">Message to @{{ msg.to }}</span>
+            <div>
+              <span class="modal-title">Message to @{{ msg.to }}</span>
+              <div class="modal-subj-header">{{ msg.subject }}</div>
+            </div>
             <button class="modal-close" onclick="closeModal('sent-{{ loop.index }}')">✕</button>
           </div>
           <div class="modal-meta">{{ msg.date }}</div>
           {% if msg.full %}<div class="modal-body-text">{{ msg.full }}</div>{% endif %}
+
+          <!-- Gmail-Style Attachment Card -->
           {% if msg.attachment %}
-            <div class="modal-attachment">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              <a href="{{ url_for('download_attachment', filename=msg.attachment) }}" class="auth-link" onclick="event.stopPropagation()">
-                {{ msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment }}
-              </a>
+            {% set fname = msg.attachment_name or (msg.attachment.split('_', 2)[-1] if '_' in msg.attachment else msg.attachment) %}
+            {% set ext = (fname.split('.')[-1] | lower) if '.' in fname else 'file' %}
+            {% set is_img = ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] %}
+            <div class="gmail-attachment-card">
+              {% if is_img %}
+                <div class="gmail-attach-preview-box">
+                  <img src="{{ url_for('download_attachment', attachment_id=msg.id) }}" alt="{{ fname }}" class="gmail-attach-thumb" />
+                </div>
+              {% endif %}
+              <div class="gmail-attach-info">
+                <div class="gmail-attach-icon-badge badge-ext-{{ ext }}">
+                  {{ ext[:4] | upper }}
+                </div>
+                <div class="gmail-attach-details">
+                  <div class="gmail-attach-filename" title="{{ fname }}">{{ fname }}</div>
+                  <div class="gmail-attach-sub">Attachment</div>
+                </div>
+                <a href="{{ url_for('download_attachment', attachment_id=msg.id) }}" class="gmail-attach-download-btn" title="Download {{ fname }}" onclick="event.stopPropagation()" download>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </a>
+              </div>
             </div>
           {% endif %}
+
+          <div style="margin-top:24px; border-top: 1px solid var(--border); padding-top: 16px; text-align:right;">
+            <button class="btn btn-ghost btn-sm" onclick="closeModal('sent-{{ loop.index }}')">Close</button>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -126,12 +215,154 @@
 </div>
 
 <style>
+.msg-subject {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-1, #e0e0e0);
+  margin: 2px 0;
+}
+.modal-subj-header {
+  font-size: 13px;
+  color: var(--accent, #7c6af7);
+  font-weight: 500;
+  margin-top: 2px;
+}
+.status-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  display: inline-block;
+}
+.badge-unread {
+  background: rgba(255, 75, 75, 0.2);
+  color: #ff4b4b;
+  border: 1px solid rgba(255, 75, 75, 0.4);
+}
+.badge-read {
+  background: rgba(100, 200, 100, 0.15);
+  color: #5cdb5c;
+  border: 1px solid rgba(100, 200, 100, 0.3);
+}
+.badge-sent {
+  background: rgba(124, 106, 247, 0.15);
+  color: #9d8df9;
+  border: 1px solid rgba(124, 106, 247, 0.3);
+}
+.unread-row {
+  border-left: 3px solid #ff4b4b !important;
+}
 .attach-badge { font-size: 12px; margin-left: 6px; }
-.modal-attachment {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 14px; padding: 10px 14px;
-  background: var(--accent-dim); border: 1px solid rgba(124,106,247,0.2);
-  border-radius: var(--radius-sm); font-size: 13px; color: var(--accent-2);
+
+/* Gmail-Style Attachment Card Component */
+.gmail-attachment-card {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  max-width: 100%;
+  border: 1px solid var(--border-2, rgba(255,255,255,0.12));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  margin-top: 16px;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.gmail-attachment-card:hover {
+  border-color: var(--accent, #7c6af7);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124, 106, 247, 0.15);
+}
+.gmail-attach-preview-box {
+  height: 130px;
+  background: #0d0e15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-2, rgba(255,255,255,0.08));
+}
+.gmail-attach-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gmail-attach-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.gmail-attach-icon-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+  background: #7c6af7;
+}
+.badge-ext-pdf { background: #ea4335 !important; }
+.badge-ext-png, .badge-ext-jpg, .badge-ext-jpeg, .badge-ext-gif, .badge-ext-webp { background: #4285f4 !important; }
+.badge-ext-doc, .badge-ext-docx, .badge-ext-txt { background: #34a853 !important; }
+.badge-ext-zip, .badge-ext-rar, .badge-ext-7z, .badge-ext-tar { background: #fbbc05 !important; color: #111 !important; }
+
+.gmail-attach-details {
+  min-width: 0;
+  flex: 1;
+}
+.gmail-attach-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1, #f0f0f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gmail-attach-sub {
+  font-size: 10px;
+  color: var(--text-3, #888);
+}
+.gmail-attach-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--text-2, #aaa);
+  background: rgba(255,255,255,0.05);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.gmail-attach-download-btn:hover {
+  background: var(--accent-dim, rgba(124,106,247,0.2));
+  color: var(--accent-2, #9d8df9);
 }
 </style>
+
+<script>
+function openInboxModal(modalId, msgId, isUnread) {
+  openModal(modalId);
+  if (isUnread) {
+    fetch('/mark_read/' + msgId, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const badge = document.getElementById('badge-' + msgId);
+          if (badge) {
+            badge.className = 'status-badge badge-read';
+            badge.textContent = 'Read';
+          }
+        }
+      })
+      .catch(err => console.error(err));
+  }
+}
+</script>
+
 {% endblock %}

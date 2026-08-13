@@ -47,6 +47,7 @@ def test_send_message_db(mock_connect, logged_in_client):
 
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
+    mock_cursor.fetchone.return_value = ('user2',)
 
     mock_conn.cursor.return_value = mock_cursor
     mock_connect.return_value = mock_conn
@@ -55,6 +56,7 @@ def test_send_message_db(mock_connect, logged_in_client):
         'receiver': 'user2',
         'message': 'Hello!'
     })
+
 
     # Ensure DB insert happened
     assert mock_cursor.execute.called

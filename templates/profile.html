@@ -14,9 +14,9 @@
   <!-- Left: Avatar card -->
   <div class="card" style="text-align:center;">
     <div class="avatar-wrap" style="margin:0 auto 16px;">
-      {% if profile and profile.avatar %}
-        <img src="{{ url_for('uploaded_file', filename=profile.avatar) }}" class="avatar-img" alt="avatar" style="object-position: center;">
-        
+      {% if profile and (profile.has_avatar or profile.avatar or profile.avatar_data) %}
+        <img src="{{ url_for('serve_avatar', user_id=session.user_id) }}" class="avatar-img" alt="avatar" style="object-position: center;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="avatar-default" style="display:none;">{{ (profile.display_name or session.user_id)[0]|upper }}</div>
         <form method="post" style="display:inline;">
           <input type="hidden" name="action" value="delete_avatar">
           <button type="submit" class="avatar-delete-btn" title="Remove photo" onclick="return confirm('Are you sure you want to remove your profile picture?');">
@@ -29,6 +29,7 @@
       {% else %}
         <div class="avatar-default">{{ (profile.display_name or session.user_id)[0]|upper }}</div>
       {% endif %}
+
       <label for="avatar-file" class="avatar-edit-btn" title="Change photo">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -68,20 +69,64 @@
   <!-- Right -->
   <div class="profile-sections">
 
-    <!-- Display Name -->
+    <!-- Display Name & Username -->
     <div class="card card-sm">
-      <div class="section-title">Display Name</div>
-      <form method="post">
+      <div class="section-title">Account Details</div>
+      
+      <!-- Update Display Name -->
+      <form method="post" style="margin-bottom: 20px;">
         <input type="hidden" name="action" value="update_name">
         <div class="form-group">
-          <label class="form-label">Name visible to others</label>
+          <label class="form-label">Display Name</label>
           <input type="text" name="display_name" class="form-control"
                  value="{{ profile.display_name if profile else '' }}"
                  placeholder="Your display name" required>
-          <p class="form-hint">This is what others see when you message them</p>
+          <p class="form-hint">Name shown to other users in messaging</p>
         </div>
         <div style="text-align:right;">
-          <button type="submit" class="btn btn-primary btn-sm">Save Name</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Display Name</button>
+        </div>
+      </form>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 18px;">
+        <!-- Update Username -->
+        <form method="post">
+          <input type="hidden" name="action" value="update_username">
+          <div class="form-group">
+            <label class="form-label">User ID / Username</label>
+            <div style="position: relative;">
+              <span style="position: absolute; left: 12px; top: 10px; color: var(--accent-2); font-family: var(--font-mono); font-size: 14px;">@</span>
+              <input type="text" name="new_user_id" class="form-control" style="padding-left: 28px; font-family: var(--font-mono);"
+                     value="{{ session.user_id }}" placeholder="username" required>
+            </div>
+            <p class="form-hint">Changing your User ID automatically cascades across all your messages</p>
+          </div>
+          <div style="text-align:right;">
+            <button type="submit" class="btn btn-primary btn-sm">Update Username</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Mobile Number (AES-128 Fernet Encrypted) -->
+    <div class="card card-sm">
+      <div class="flex-between" style="margin-bottom: 12px;">
+        <div class="section-title" style="margin-bottom:0;">Mobile Phone Number</div>
+        <span class="status-badge badge-sent" style="font-size:11px; font-weight: 500;" title="AES-128 Fernet Encryption">
+          🔒 Encrypted PII
+        </span>
+      </div>
+      <form method="post">
+        <input type="hidden" name="action" value="update_mobile">
+        <div class="form-group">
+          <label class="form-label">Phone Number for SMS Notifications</label>
+          <input type="tel" name="mobile_no" class="form-control" style="font-family: var(--font-mono);"
+                 value="{{ profile.mobile_no if profile and profile.mobile_no else '' }}"
+                 placeholder="+919876543210 or 10-digit number">
+          <p class="form-hint">🔒 Encrypted in MySQL with Fernet AES key. Never stored as plain text.</p>
+        </div>
+        <div style="text-align:right;">
+          <button type="submit" class="btn btn-primary btn-sm">Save Mobile Number</button>
         </div>
       </form>
     </div>
@@ -126,7 +171,7 @@
     <div class="card card-sm danger-zone">
       <div class="section-title">Danger Zone</div>
       <p class="text-muted text-sm" style="margin-bottom:16px;">
-        Permanently deletes your account and all your messages. This cannot be undone.
+        Deletes your account and puts data in secure backup state. You can restore your account anytime by logging back in.
       </p>
       <button class="btn btn-danger btn-sm" onclick="document.getElementById('delete-modal').classList.add('open')" type="button">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -147,20 +192,21 @@
       <button class="modal-close" onclick="document.getElementById('delete-modal').classList.remove('open')">✕</button>
     </div>
     <p class="text-muted text-sm" style="margin-bottom:20px;">
-      This will permanently delete your account, all your messages, and your personal database. Confirm by entering your password.
+      This will deactivate your account and back up your messages securely. You can restore your account at any time by simply logging back in with your password.
     </p>
     <form method="post" action="{{ url_for('delete_account') }}">
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label">Confirm with Password</label>
         <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
       </div>
       <div class="flex gap-12" style="justify-content:flex-end;">
         <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('delete-modal').classList.remove('open')">Cancel</button>
-        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete Everything</button>
+        <button type="submit" class="btn btn-danger btn-sm">Deactivate Account</button>
       </div>
     </form>
   </div>
 </div>
+
 
 <!-- Cropper Modal -->
 <div class="modal-overlay" id="cropper-modal">

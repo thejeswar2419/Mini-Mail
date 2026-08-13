@@ -4,3 +4,6 @@ pytest
 pytest-cov
 python-dotenv
 gunicorn
+mysql-connector-python
+twilio
+cryptography

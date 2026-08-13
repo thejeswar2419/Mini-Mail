@@ -22,11 +22,13 @@
     <!-- TOP: User profile area (clickable → profile page) -->
     <a href="{{ url_for('profile') }}" class="sidebar-profile {% if request.endpoint == 'profile' %}sp-active{% endif %}">
       <div class="sp-avatar-wrap">
-        {% if profile and profile.avatar %}
-          <img src="{{ url_for('uploaded_file', filename=profile.avatar) }}" class="sp-avatar" alt="avatar">
+        {% if profile and (profile.has_avatar or profile.avatar or profile.avatar_data) %}
+          <img src="{{ url_for('serve_avatar', user_id=session.user_id) }}" class="sp-avatar" alt="avatar" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="sp-avatar sp-avatar-default" style="display:none;">{{ (session.user_name or session.user_id)[0]|upper }}</div>
         {% else %}
           <div class="sp-avatar sp-avatar-default">{{ (session.user_name or session.user_id)[0]|upper }}</div>
         {% endif %}
+
         <div class="sp-online-dot"></div>
       </div>
       <div class="sp-info">

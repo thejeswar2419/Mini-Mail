@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Restore Account — Mini Mail{% endblock %}
+{% block content %}
+<div style="max-width: 480px; margin: 60px auto;" class="card">
+  <div style="text-align: center; margin-bottom: 24px;">
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--accent-dim);border:1px solid rgba(124,106,247,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+    </div>
+    <h2 style="font-size: 22px; font-weight: 700; color: var(--text-1); margin-bottom: 6px;">Restore Account?</h2>
+    <p class="text-muted text-sm">
+      Account <strong>@{{ account.user_ID if account else session.pending_restore_uid }}</strong> was previously deleted and backed up safely.
+    </p>
+    {% if account and account.deleted_at %}
+      <div class="status-badge badge-unread" style="margin-top: 12px;">
+        Deleted on {{ account.deleted_at_str if account.deleted_at_str else account.deleted_at }}
+      </div>
+    {% endif %}
+
+  </div>
+
+  <div style="background: rgba(124,106,247,0.06); border: 1px solid rgba(124,106,247,0.2); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; font-size: 13px; color: var(--text-2);">
+    🔒 Restoring your account will instantly bring back your full profile, inbox messages, sent history, and settings without any data loss.
+  </div>
+
+  <form method="post">
+    <div class="flex gap-12" style="justify-content: space-between;">
+      <button type="submit" name="action" value="cancel" class="btn btn-ghost" style="flex:1;">Cancel</button>
+      <button type="submit" name="action" value="restore" class="btn btn-primary" style="flex:2;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        Restore Account & Log In
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

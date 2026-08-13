@@ -13,10 +13,18 @@
       <div class="form-group">
         <label class="form-label">To (User ID)</label>
         <input type="text" name="receiver" id="receiver-input" class="form-control"
+               value="{{ prefill_to or '' }}"
                placeholder="enter_user_id" autocomplete="off" required
                oninput="lookupUser(this.value)">
         <div id="receiver-status" style="margin-top:8px;"></div>
       </div>
+
+      <div class="form-group">
+        <label class="form-label">Subject <span style="color:var(--text-3);font-size:10px;">(optional)</span></label>
+        <input type="text" name="subject" class="form-control" value="{{ prefill_subject or '' }}" placeholder="Enter message subject…" maxlength="255">
+      </div>
+
+
 
       <div class="form-group">
         <label class="form-label">Message</label>
@@ -114,5 +122,12 @@ dz.addEventListener('drop', e => {
   fi.files = e.dataTransfer.files;
   previewAttachment(fi);
 });
+{% if prefill_to %}
+window.addEventListener('DOMContentLoaded', () => {
+  const rec = document.getElementById('receiver-input').value;
+  if (rec) lookupUser(rec);
+});
+{% endif %}
 </script>
+
 {% endblock %}
