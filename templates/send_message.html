@@ -12,49 +12,90 @@
     <form method="post" enctype="multipart/form-data" id="compose-form">
       <div class="form-group">
         <label class="form-label">To (User ID)</label>
-        <input type="text" name="receiver" id="receiver-input" class="form-control"
-               value="{{ prefill_to or '' }}"
-               placeholder="enter_user_id" autocomplete="off" required
-               oninput="lookupUser(this.value)">
+        <input type="text" name="receiver" id="receiver-input" class="form-control" value="{{ prefill_to or '' }}"
+          placeholder="enter_user_id" autocomplete="off" required oninput="lookupUser(this.value)">
         <div id="receiver-status" style="margin-top:8px;"></div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Subject <span style="color:var(--text-3);font-size:10px;">(optional)</span></label>
-        <input type="text" name="subject" class="form-control" value="{{ prefill_subject or '' }}" placeholder="Enter message subject…" maxlength="255">
+        <input type="text" name="subject" class="form-control" value="{{ prefill_subject or '' }}"
+          placeholder="Enter message subject…" maxlength="255">
       </div>
 
 
 
+      <!-- AI Smart Reply Assistant Widget -->
+      <div class="ai-reply-widget"
+        style="background: rgba(124,106,247,0.06); border: 1px dashed rgba(124,106,247,0.3); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
+        <div class="flex-between" style="margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div
+            style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; color:var(--accent-2);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+            ✨ AI Smart Reply Assistant
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <select id="ai-intent-select" class="form-control"
+              style="font-size:11px; padding:3px 8px; height:auto; width:auto; background:var(--surface-2); border-color:var(--border-2); color:var(--text-1);"
+              onchange="fetchAISmartReplies()">
+              <option value="all">⚡ Balanced (Auto)</option>
+              <option value="positive">👍 Positive / Accept</option>
+              <option value="negative">👎 Negative / Decline</option>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-gen-btn" onclick="fetchAISmartReplies()"
+              style="font-size:11px; padding:4px 10px;">
+              Generate Suggestions
+            </button>
+          </div>
+        </div>
+        <div id="ai-replies-container"
+          style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px;">
+          <div class="text-muted" style="font-size:12px; grid-column: 1 / -1;">
+            Select a stance above & click <strong>Generate Suggestions</strong> to get 4 AI response options.
+          </div>
+        </div>
+      </div>
+
+
       <div class="form-group">
         <label class="form-label">Message</label>
-        <textarea name="message" id="msg-area" class="form-control" rows="7"
-                  placeholder="Write your message here…" maxlength="2000"></textarea>
+        <textarea name="message" id="msg-area" class="form-control" rows="7" placeholder="Write your message here…"
+          maxlength="2000">{{ prefill_body or '' }}</textarea>
         <div class="flex-between mt-4">
           <span class="form-hint">Max 2000 characters</span>
           <span class="form-hint" id="char-count">0 / 2000</span>
         </div>
       </div>
 
+
       <!-- Attachment -->
       <div class="form-group">
-        <label class="form-label">Attachment <span style="color:var(--text-3);font-size:10px;">(optional)</span></label>
+        <label class="form-label">Attachment <span style="color:var(--text-3);font-size:10px;"></span></label>
         <div class="attach-drop-zone" id="drop-zone" onclick="document.getElementById('attach-input').click()">
           <div class="attach-idle" id="attach-idle">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-3); margin-bottom:8px;">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+              style="color:var(--text-3); margin-bottom:8px;">
+              <path
+                d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
             </svg>
             <span style="color:var(--text-2); font-size:13px;">Click to attach a file</span>
             <span style="color:var(--text-3); font-size:11px; margin-top:4px;">Any file type · Max 20 MB</span>
           </div>
           <div class="attach-preview" id="attach-preview" style="display:none;">
             <div class="attach-file-chip" id="attach-chip">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent); flex-shrink:0;">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="color:var(--accent); flex-shrink:0;">
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
               <span id="attach-name" style="font-size:13px; color:var(--text-1);"></span>
               <span id="attach-size" style="font-size:11px; color:var(--text-3);"></span>
-              <button type="button" onclick="clearAttachment(event)" style="background:none;border:none;cursor:pointer;color:var(--text-3);padding:2px 4px;margin-left:auto;font-size:14px;" title="Remove">✕</button>
+              <button type="button" onclick="clearAttachment(event)"
+                style="background:none;border:none;cursor:pointer;color:var(--text-3);padding:2px 4px;margin-left:auto;font-size:14px;"
+                title="Remove">✕</button>
             </div>
           </div>
         </div>
@@ -65,8 +106,8 @@
         <a href="{{ url_for('view_messages') }}" class="btn btn-ghost">Cancel</a>
         <button type="submit" class="btn btn-primary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
           Send Message
         </button>
@@ -76,58 +117,124 @@
 </div>
 
 <style>
-.attach-drop-zone {
-  border: 1.5px dashed var(--border-2);
-  border-radius: var(--radius-sm);
-  padding: 24px 20px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
-  text-align: center;
-}
-.attach-drop-zone:hover {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-}
-.attach-idle { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
-.attach-file-chip {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: var(--surface-2); border: 1px solid var(--border-2);
-  border-radius: var(--radius-sm); padding: 10px 14px; width: 100%;
-}
+  .attach-drop-zone {
+    border: 1.5px dashed var(--border-2);
+    border-radius: var(--radius-sm);
+    padding: 24px 20px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    text-align: center;
+  }
+
+  .attach-drop-zone:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .attach-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .attach-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    width: 100%;
+  }
 </style>
 
 <script>
-function previewAttachment(input) {
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  document.getElementById('attach-idle').style.display   = 'none';
-  document.getElementById('attach-preview').style.display = 'block';
-  document.getElementById('attach-name').textContent = file.name;
-  const mb = (file.size / 1024 / 1024).toFixed(2);
-  document.getElementById('attach-size').textContent = `${mb} MB`;
-}
-function clearAttachment(e) {
-  e.stopPropagation();
-  document.getElementById('attach-input').value = '';
-  document.getElementById('attach-idle').style.display    = 'flex';
-  document.getElementById('attach-preview').style.display = 'none';
-}
-// Drag and drop
-const dz = document.getElementById('drop-zone');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'var(--accent-dim)'; });
-dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; dz.style.background = ''; });
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.style.borderColor = ''; dz.style.background = '';
-  const fi = document.getElementById('attach-input');
-  fi.files = e.dataTransfer.files;
-  previewAttachment(fi);
-});
-{% if prefill_to %}
-window.addEventListener('DOMContentLoaded', () => {
-  const rec = document.getElementById('receiver-input').value;
-  if (rec) lookupUser(rec);
-});
-{% endif %}
+  function previewAttachment(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    document.getElementById('attach-idle').style.display = 'none';
+    document.getElementById('attach-preview').style.display = 'block';
+    document.getElementById('attach-name').textContent = file.name;
+    const mb = (file.size / 1024 / 1024).toFixed(2);
+    document.getElementById('attach-size').textContent = `${mb} MB`;
+  }
+  function clearAttachment(e) {
+    e.stopPropagation();
+    document.getElementById('attach-input').value = '';
+    document.getElementById('attach-idle').style.display = 'flex';
+    document.getElementById('attach-preview').style.display = 'none';
+  }
+  // Drag and drop
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'var(--accent-dim)'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; dz.style.background = ''; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.style.borderColor = ''; dz.style.background = '';
+    const fi = document.getElementById('attach-input');
+    fi.files = e.dataTransfer.files;
+    previewAttachment(fi);
+  });
+
+  function fetchAISmartReplies() {
+    const container = document.getElementById('ai-replies-container');
+    const btn = document.getElementById('ai-gen-btn');
+    const subject = document.querySelector('input[name="subject"]').value;
+    const msgArea = document.getElementById('msg-area').value;
+    const intent = document.getElementById('ai-intent-select') ? document.getElementById('ai-intent-select').value : 'all';
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    container.innerHTML = '<div style="font-size:12px; color:var(--text-3); grid-column:1/-1;">✨ AI is analyzing context and generating tailored responses...</div>';
+
+    fetch(`/api/ai/smart_reply?subject=${encodeURIComponent(subject)}&message_text=${encodeURIComponent(msgArea)}&intent=${encodeURIComponent(intent)}`)
+
+      .then(r => r.json())
+      .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Regenerate';
+        if (data.success && data.replies) {
+          container.innerHTML = '';
+          data.replies.forEach(rep => {
+            const chip = document.createElement('div');
+            chip.className = 'ai-reply-chip';
+            chip.style.cssText = 'background:var(--surface-2); border:1px solid var(--border-2); border-radius:8px; padding:10px; cursor:pointer; transition:all 0.2s ease;';
+            chip.onmouseover = () => { chip.style.borderColor = 'var(--accent)'; chip.style.transform = 'translateY(-1px)'; };
+            chip.onmouseout = () => { chip.style.borderColor = 'var(--border-2)'; chip.style.transform = 'none'; };
+            chip.innerHTML = `
+            <div style="font-size:11px; font-weight:700; color:var(--accent-2); margin-bottom:4px; display:flex; justify-content:space-between;">
+              <span>${rep.tone}</span>
+              <span style="font-weight:400; color:var(--text-3);">${rep.label}</span>
+            </div>
+            <div style="font-size:12px; color:var(--text-1); line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${rep.text}</div>
+          `;
+            chip.onclick = () => {
+              const textarea = document.getElementById('msg-area');
+              textarea.value = rep.text;
+              textarea.dispatchEvent(new Event('input'));
+              textarea.focus();
+              document.querySelectorAll('.ai-reply-chip').forEach(c => c.style.borderColor = 'var(--border-2)');
+              chip.style.borderColor = 'var(--accent)';
+            };
+            container.appendChild(chip);
+          });
+        }
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Generate Suggestions';
+        container.innerHTML = '<div style="font-size:12px; color:var(--danger); grid-column:1/-1;">Failed to generate AI replies.</div>';
+      });
+  }
+
+  {% if prefill_to or prefill_subject %}
+  window.addEventListener('DOMContentLoaded', () => {
+    const rec = document.getElementById('receiver-input').value;
+    if (rec) lookupUser(rec);
+    fetchAISmartReplies();
+  });
+  {% endif %}
 </script>
 
 {% endblock %}

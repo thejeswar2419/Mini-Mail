@@ -7,3 +7,5 @@ gunicorn
 mysql-connector-python
 twilio
 cryptography
+google-genai
+requests

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import secrets
 import base64
 import io
@@ -907,7 +909,323 @@ def send_message():
 
     prefill_to = request.args.get("to", "").strip()
     prefill_subject = request.args.get("subject", "").strip()
-    return render_template("send_message.html", prefill_to=prefill_to, prefill_subject=prefill_subject)
+    prefill_body = request.args.get("reply_body", "").strip()
+    return render_template("send_message.html", prefill_to=prefill_to, prefill_subject=prefill_subject, prefill_body=prefill_body)
+
+# --- AI Smart Reply Generator Engine ---
+def generate_ai_smart_replies(subject: str, message_text: str, intent: str = "all") -> list:
+    """
+    Generates 4 distinct smart reply variations based on received message context and user preference (intent).
+    intent options: "all" (auto/balanced), "positive" (accept/agree), "negative" (decline/reject).
+    Prioritizes OpenRouter API if OPENROUTER_API_KEY is available.
+    Falls back to Google Gemini API if GEMINI_API_KEY is available, or an intelligent NLP rule engine fallback.
+    """
+    import json
+
+    intent = (intent or "all").lower().strip()
+    if intent in ("accept", "yes", "positive", "pos"):
+        intent = "positive"
+    elif intent in ("reject", "no", "negative", "neg", "decline"):
+        intent = "negative"
+    else:
+        intent = "all"
+
+    intent_directive = ""
+    if intent == "positive":
+        intent_directive = """
+CRITICAL STANCE INSTRUCTION: Generate 4 distinct POSITIVE, ACCEPTING, or AGREEABLE reply options. 
+Examples: Accepting invitations/proposals, agreeing to requests, expressing enthusiasm, confirming availability, and positive acknowledgments.
+"""
+    elif intent == "negative":
+        intent_directive = """
+CRITICAL STANCE INSTRUCTION: Generate 4 distinct NEGATIVE, DECLINING, or REJECTING reply options. 
+Examples: Politely declining invitations/proposals, expressing inability to participate, stating unavailability, proposing alternatives, or polite refusal.
+"""
+
+    prompt = f"""
+Analyze the following email message and generate 4 distinct, helpful reply options.
+Subject: {subject or '(No Subject)'}
+Message Content: {message_text or '(No Text)'}
+{intent_directive}
+Return EXACTLY 4 JSON objects in a valid JSON list format without markdown code fences. Each object must have:
+- "tone": one of ["Formal", "Direct", "Casual", "Detailed"]
+- "label": short 2-4 word summary title of the response
+- "text": the actual complete reply message text ready to send.
+"""
+
+    # --- 1. Primary AI Engine: OpenRouter API ---
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if openrouter_key and len(openrouter_key) > 5:
+        try:
+            import requests
+            primary_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash").strip()
+            candidate_models = [primary_model, "google/gemini-2.5-flash", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat"]
+            
+            # De-duplicate candidate models list while maintaining order
+            seen = set()
+            unique_models = [m for m in candidate_models if not (m in seen or seen.add(m))]
+
+            for model_name in unique_models:
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "HTTP-Referer": "http://localhost:5000",
+                        "X-Title": "MiniMail",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You are an AI email assistant. Output raw valid JSON containing a JSON array of 4 objects as requested."
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        "temperature": 0.7
+                    }
+                    response = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=12
+                    )
+                    if response.status_code == 200:
+                        res_data = response.json()
+                        raw_text = res_data["choices"][0]["message"]["content"].strip()
+                        if raw_text.startswith("```json"):
+                            raw_text = raw_text[7:]
+                        if raw_text.startswith("```"):
+                            raw_text = raw_text[3:]
+                        if raw_text.endswith("```"):
+                            raw_text = raw_text[:-3]
+                        raw_text = raw_text.strip()
+                        
+                        parsed = json.loads(raw_text)
+                        if isinstance(parsed, list) and len(parsed) >= 4:
+                            return parsed[:4]
+                except Exception as model_err:
+                    print(f"[AI OPENROUTER MODEL ERROR - {model_name}] {model_err}")
+                    continue
+        except Exception as e:
+            print(f"[AI OPENROUTER API FALLBACK] {e}")
+
+    # --- 2. Fallback AI Engine: Google Gemini API ---
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if api_key and len(api_key) > 5:
+        try:
+            from google import genai
+            client = genai.Client(api_key=api_key)
+            for model_name in ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash']:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                    )
+                    raw_text = response.text.strip()
+                    if raw_text.startswith("```json"):
+                        raw_text = raw_text[7:]
+                    if raw_text.startswith("```"):
+                        raw_text = raw_text[3:]
+                    if raw_text.endswith("```"):
+                        raw_text = raw_text[:-3]
+                    raw_text = raw_text.strip()
+                    parsed = json.loads(raw_text)
+                    if isinstance(parsed, list) and len(parsed) >= 4:
+                        return parsed[:4]
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"[AI GEMINI API FALLBACK] {e}")
+
+    # --- 3. Intelligent Built-in NLP Rule Engine Fallback ---
+    sub_lower = (subject or "").lower()
+    msg_lower = (message_text or "").lower()
+    
+    is_urgent = any(w in sub_lower or w in msg_lower for w in ["urgent", "asap", "important", "priority", "immediately"])
+    is_meeting = any(w in sub_lower or w in msg_lower for w in ["meet", "meeting", "call", "schedule", "time", "demo", "zoom", "discussion"])
+    is_thanks = any(w in sub_lower or w in msg_lower for w in ["thanks", "thank you", "appreciated", "great work", "cheers"])
+    
+    subject_clean = subject.replace("Re: ", "").replace("re: ", "").strip() or "your message"
+
+    if intent == "positive":
+        return [
+            {
+                "tone": "Formal",
+                "label": "Formal Acceptance",
+                "text": f"Thank you for reaching out regarding '{subject_clean}'. I am pleased to accept and confirm our agreement. Looking forward to moving ahead."
+            },
+            {
+                "tone": "Direct",
+                "label": "Accepted / Confirmed",
+                "text": f"Thanks! I accept and agree with '{subject_clean}'. Let's proceed as discussed."
+            },
+            {
+                "tone": "Casual",
+                "label": "Sounds Great!",
+                "text": f"Awesome! I'm completely on board with '{subject_clean}'. Count me in!"
+            },
+            {
+                "tone": "Detailed",
+                "label": "Enthusiastic Agreement",
+                "text": f"Hello! Thank you for the update on '{subject_clean}'. I have reviewed everything and am happy to approve. Please send over any next steps or documentation."
+            }
+        ]
+    elif intent == "negative":
+        return [
+            {
+                "tone": "Formal",
+                "label": "Polite Refusal",
+                "text": f"Thank you for your message regarding '{subject_clean}'. Unfortunately, I am unable to accept at this time due to prior commitments. Thank you for your understanding."
+            },
+            {
+                "tone": "Direct",
+                "label": "Decline Request",
+                "text": f"Thanks for reaching out, but I will have to decline regarding '{subject_clean}' at this moment."
+            },
+            {
+                "tone": "Casual",
+                "label": "Can't Make It",
+                "text": f"Hey! Thanks for thinking of me regarding '{subject_clean}', but I won't be able to make it work right now. Hope to catch up another time!"
+            },
+            {
+                "tone": "Detailed",
+                "label": "Regretful Decline",
+                "text": f"Hello. Thank you for sharing details about '{subject_clean}'. After careful review, I regret that I cannot proceed with this request currently. I appreciate your time and consideration."
+            }
+        ]
+    else:
+        if is_meeting:
+            return [
+                {
+                    "tone": "Formal",
+                    "label": "Confirm & Available",
+                    "text": f"Thank you for reaching out regarding '{subject_clean}'. I would be pleased to schedule a discussion. Please let me know what dates and times work best for your team."
+                },
+                {
+                    "tone": "Direct",
+                    "label": "Quick Availability",
+                    "text": f"Thanks! I am available to discuss '{subject_clean}'. What date and time work best on your side?"
+                },
+                {
+                    "tone": "Casual",
+                    "label": "Sounds Good!",
+                    "text": f"Hey! I'd love to chat about '{subject_clean}'. Send over a calendar invite or let me know when you're free!"
+                },
+                {
+                    "tone": "Detailed",
+                    "label": "Propose Times & Agenda",
+                    "text": f"Hello! Thanks for reaching out regarding '{subject_clean}'. I've reviewed your request and am available tomorrow afternoon or later this week. Let's touch base soon!"
+                }
+            ]
+        elif is_urgent:
+            return [
+                {
+                    "tone": "Formal",
+                    "label": "Immediate Priority",
+                    "text": f"I have received your urgent update regarding '{subject_clean}'. I am prioritizing this immediately and will provide a follow-up status report shortly."
+                },
+                {
+                    "tone": "Direct",
+                    "label": "On It Now",
+                    "text": f"Got it. Working on '{subject_clean}' right away and will keep you posted as soon as it's resolved."
+                },
+                {
+                    "tone": "Casual",
+                    "label": "Fast Acknowledgment",
+                    "text": f"Thanks for flagging this! I'm on it right now and will get back to you ASAP."
+                },
+                {
+                    "tone": "Detailed",
+                    "label": "Reviewing Details",
+                    "text": f"Thank you for bringing '{subject_clean}' to my attention. I am giving this immediate priority and am reviewing the details to resolve it as quickly as possible."
+                }
+            ]
+        elif is_thanks:
+            return [
+                {
+                    "tone": "Formal",
+                    "label": "Gracious Response",
+                    "text": f"Thank you very much. It was a pleasure working with you on '{subject_clean}', and I remain at your disposal should you require any further assistance."
+                },
+                {
+                    "tone": "Direct",
+                    "label": "You're Welcome",
+                    "text": f"You're very welcome! Glad I could help with '{subject_clean}'."
+                },
+                {
+                    "tone": "Casual",
+                    "label": "Anytime!",
+                    "text": f"No problem at all! Happy to help anytime. Hope you have a wonderful rest of your day!"
+                },
+                {
+                    "tone": "Detailed",
+                    "label": "Appreciative Follow-up",
+                    "text": f"Thank you so much for the kind words! I really enjoyed collaborating with you on '{subject_clean}'. Let me know whenever you'd like to work together again."
+                }
+            ]
+        else:
+            return [
+                {
+                    "tone": "Formal",
+                    "label": "Formal Acknowledgment",
+                    "text": f"Thank you for your message regarding '{subject_clean}'. I have received your email and will review the information thoroughly before replying."
+                },
+                {
+                    "tone": "Direct",
+                    "label": "Quick Acknowledgment",
+                    "text": f"Thanks for your message regarding '{subject_clean}'. I have noted your updates and will follow up with you shortly."
+                },
+                {
+                    "tone": "Casual",
+                    "label": "Friendly Reply",
+                    "text": f"Hey! Thanks for reaching out about '{subject_clean}'. I got your message and will get back to you soon!"
+                },
+                {
+                    "tone": "Detailed",
+                    "label": "Comprehensive Response",
+                    "text": f"Hello! Thank you for sharing the information on '{subject_clean}'. I am currently reviewing the details you sent over and will provide a complete response shortly."
+                }
+            ]
+
+@app.route("/api/ai/smart_reply", methods=["GET", "POST"])
+def ai_smart_reply_api():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    msg_id = request.args.get("msg_id") or request.form.get("msg_id")
+    subject = request.args.get("subject") or request.form.get("subject") or ""
+    message_text = request.args.get("message_text") or request.form.get("message_text") or ""
+    intent = request.args.get("intent") or request.form.get("intent") or "all"
+    
+    if msg_id and (not message_text or not subject):
+        uid = current_user_id()
+        con = None
+        cur = None
+        try:
+            con = connect_db()
+            cur = con.cursor(dictionary=True)
+            cur.execute("SELECT subject, message_text FROM messages WHERE id=%s AND (sender_id=%s OR receiver_id=%s)", (msg_id, uid, uid))
+            row = cur.fetchone()
+            if row:
+                subject = row.get("subject") or subject
+                message_text = row.get("message_text") or message_text
+        except Exception:
+            pass
+        finally:
+            try:
+                if cur: cur.close()
+                if con: con.close()
+            except Exception:
+                pass
+                
+    replies = generate_ai_smart_replies(subject, message_text, intent=intent)
+    return jsonify({"success": True, "replies": replies})
+
+
 
 # --- View Messages ---
 @app.route("/messages")
